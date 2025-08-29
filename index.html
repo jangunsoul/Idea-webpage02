@@ -28,7 +28,10 @@
   class Main extends Phaser.Scene {
     constructor(){ super('main'); }
 
-    preload(){}
+    preload(){
+      this.load.image('zombieLeft', 'https://i.imgur.com/NZN3Gcf.png');
+      this.load.image('zombieRight', 'https://i.imgur.com/A28Nf1P.png');
+    }
 
     create(){
       // ---------- 간단 텍스처/아이콘 ----------
@@ -52,11 +55,6 @@
       mkRect('aoe',   26, 18, 0x44ff44);
       mkRect('slow',  26, 18, 0x44aaff);
       mkRect('bullet', 8, 4, 0xfff176);
-
-      // 해골(좀비) 텍스처: worker/boss/robot 변형
-      this.makeSkullTexture('skullWorker', 0xc5e1a5, 0x2e7d32); // 연녹 skull
-      this.makeSkullTexture('skullBoss',   0xd1c4e9, 0x6a1b9a); // 보라 skull(크게)
-      this.makeSkullTexture('skullRobot',  0xb0bec5, 0x37474f); // 회색 skull
 
       // 상자
       mkRect('crate', 22,22, 0xff7043);
@@ -215,16 +213,17 @@
 
     spawnZombie(kind='worker'){
       const laneY = Phaser.Utils.Array.GetRandom(lanes);
-      const key = kind==='boss' ? 'skullBoss' : (kind==='robot' ? 'skullRobot' : 'skullWorker');
-      const z = this.physics.add.image(W+36, laneY, key);
+      // 그룹에 직접 생성하여 물리 속성 적용
+      const z = this.zombies.create(-20, laneY, 'zombieRight');
+      z.setScale(0.2);                   // 컨베이어 아이템과 비슷한 크기
+      z.body.setSize(z.displayWidth, z.displayHeight, true);
       z.kind = kind;
       z.hp = (kind==='boss'? 240 : kind==='robot'? 55 : 70) * (1 + (wave-1)*0.18);
       z.speed = (kind==='boss'? 26 : kind==='robot'? 95 : 58) * (1 + (wave-1)*0.04);
       z.attack = (kind==='boss'? 14 : kind==='robot'? 6 : 8) * (1 + (wave-1)*0.08);
       z.body.setAllowGravity(false);
       z.setDepth(3);
-      z.setVelocityX(-z.speed);           // 좌측 바리케이드(도달점)로 전진
-      this.zombies.add(z);
+      z.body.setVelocityX(z.speed);      // 오른쪽으로 이동
     }
 
     // 처치 보상
@@ -281,8 +280,8 @@
       this.zombies.getChildren().forEach(z => {
         if (!z.active) return;
 
-        // 좌측 바리케이드(도달점) 도착
-        if (z.x < 36){
+        // 우측 바리케이드 도착
+        if (z.x > W-36){
           baseHP -= 10;   // 도달 데미지
           z.destroy();
           if (baseHP <= 0) this.endGame();
@@ -364,8 +363,8 @@
       this.zombies.getChildren().forEach(z=>{
         if(Phaser.Math.Distance.Between(p.x,p.y,z.x,z.y)<r){
           z.hp -= p.damage*0.6;               // 약간의 피해
-          z.setVelocityX(-z.speed*0.55);      // 감속
-          this.time.delayedCall(1400, ()=>{ if(z.active) z.setVelocityX(-z.speed); });
+          z.body.setVelocityX(z.speed*0.45);  // 감속
+          this.time.delayedCall(1400, ()=>{ if(z.active) z.body.setVelocityX(z.speed); });
           if(z.hp<=0) this.onZombieKilled(z);
         }
       });
