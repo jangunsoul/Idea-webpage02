@@ -213,10 +213,12 @@
 
     spawnZombie(kind='worker'){
       const laneY = Phaser.Utils.Array.GetRandom(lanes);
+
       // 그룹에 직접 생성하여 물리 속성 적용
       const z = this.zombies.create(-20, laneY, 'zombieRight');
       z.setScale(0.2);                   // 컨베이어 아이템과 비슷한 크기
       z.body.setSize(z.displayWidth, z.displayHeight, true);
+
       z.kind = kind;
       z.hp = (kind==='boss'? 240 : kind==='robot'? 55 : 70) * (1 + (wave-1)*0.18);
       z.speed = (kind==='boss'? 26 : kind==='robot'? 95 : 58) * (1 + (wave-1)*0.04);
