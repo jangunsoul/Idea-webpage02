@@ -200,6 +200,7 @@
       this.zombies.add(z);
 
       // 다음 스폰 예약 (가속 로직 유지)
+
       this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
       this.time.delayedCall(this.spawnDelay,()=>this.spawnZombie());
     }
