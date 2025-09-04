@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Factory Defense</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Defend the Factory</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     html,body{margin:0;height:100%;background:#1e1b1b;font-family:system-ui,-apple-system,Segoe UI,Roboto}
     #game{display:flex;align-items:center;justify-content:center;height:100%}
@@ -15,41 +15,63 @@
 <div id="game"></div>
 <script>
 (() => {
-  const W = 960, H = 540;
-  const belt = { left: W/2-192, right: W/2+192, top: H/2-96, bottom: H/2+96 };
-  const beltSpeed = 60;
-  const maxBaseHP = 100;
+  const W=960, H=540;
+  let coins=0;
+  let baseHP=100;
 
-  let coins = 0, baseHP = maxBaseHP, wave = 1;
+  class Boot extends Phaser.Scene {
+    constructor(){ super('boot'); }
+    preload(){
+      this.load.spritesheet('zombie','resources/sprites/zombie.png',{frameWidth:32,frameHeight:32});
+      this.load.image('turret','resources/sprites/product_turret.png');
+      this.load.spritesheet('conveyor','resources/tiles/conveyor.png',{frameWidth:64,frameHeight:32});
+      this.load.image('floor','resources/tiles/floor.png');
+      this.load.image('coin','resources/ui/coin.png');
+      this.load.image('laser','resources/effects/laser.png');
+    }
+    create(){
+      this.anims.create({key:'zombie_walk',frames:this.anims.generateFrameNumbers('zombie',{start:0,end:3}),frameRate:6,repeat:-1});
+      this.anims.create({key:'belt_move',frames:this.anims.generateFrameNumbers('conveyor',{start:0,end:1}),frameRate:6,repeat:-1});
+      this.scene.start('title');
+    }
+  }
+
+  class Title extends Phaser.Scene {
+    constructor(){ super('title'); }
+    create(){
+      this.add.text(W/2,H/2-40,'Defend the Factory',{fontSize:48,color:'#fff'}).setOrigin(0.5);
+      this.add.text(W/2,H/2+40,'Tap to Start',{fontSize:24,color:'#fff'}).setOrigin(0.5);
+      this.input.once('pointerdown',()=>this.scene.start('quest'));
+    }
+  }
+
+  class Quest extends Phaser.Scene {
+    constructor(){ super('quest'); }
+    create(){
+      this.add.text(W/2,H/2-20,'Stage 1',{fontSize:32,color:'#fff'}).setOrigin(0.5);
+      this.add.text(W/2,H/2+20,'Defend the factory from zombies',{fontSize:24,color:'#fff'}).setOrigin(0.5);
+      this.add.text(W/2,H-60,'Tap to Start',{fontSize:24,color:'#fff'}).setOrigin(0.5);
+      this.input.once('pointerdown',()=>this.scene.start('main'));
+    }
+  }
 
   class Main extends Phaser.Scene {
     constructor(){ super('main'); }
-    preload(){
-      // sprites
-      this.load.spritesheet('zombie','resources/sprites/zombie.png',{frameWidth:32,frameHeight:32});
-      this.load.image('product','resources/sprites/product_turret.png');
-      // tiles
-      this.load.image('floor','resources/tiles/floor.png');
-      this.load.spritesheet('conveyor','resources/tiles/conveyor.png',{frameWidth:64,frameHeight:32});
-      this.load.spritesheet('conveyorCorner','resources/tiles/conveyor_cross.png',{frameWidth:64,frameHeight:32});
-      this.load.image('out','resources/tiles/out.png');
-      // ui
-      this.load.image('btnProduce','resources/ui/btn_produce.png');
-      this.load.image('coin','resources/ui/coin.png');
-      this.load.image('waveBanner','resources/ui/wave_banner.png');
-      this.load.image('chest','resources/ui/chest.png');
-      this.load.image('pickupDollar','resources/ui/pickup_dollar.png');
-      // effects
-      this.load.image('bullet','resources/effects/bullet.png');
-    }
     create(){
       // floor
-      const floor = this.add.tileSprite(0,0,W,H,'floor');
-      floor.setOrigin(0,0);
+      this.add.tileSprite(0,0,W,H,'floor').setOrigin(0);
 
-      // build conveyor loop
-      this.buildBelt();
-      this.add.image((belt.left+belt.right)/2, belt.bottom+32,'out');
+      // conveyor belt across center
+      this.beltY = H/2;
+      for(let x=32;x<W;x+=64){
+        this.add.sprite(x,this.beltY,'conveyor').play('belt_move');
+      }
+
+      // belt collision zone
+      this.beltZone = this.add.zone(W/2,this.beltY,W,32);
+      this.physics.world.enable(this.beltZone);
+      this.beltZone.body.setAllowGravity(false).setImmovable(true);
+
 
       // groups
       this.products = this.physics.add.group();
@@ -57,161 +79,144 @@
       this.bullets = this.physics.add.group({allowGravity:false});
       this.drops = this.physics.add.group({allowGravity:false});
 
-      // animations
-      this.anims.create({ key:'zombie_walk', frames:this.anims.generateFrameNumbers('zombie',{start:0,end:3}), frameRate:6, repeat:-1 });
-
-      // UI elements
-      this.nextEnemy = 'zombie';
-      this.nextIcon = this.add.sprite(40,40,'zombie',0).setScale(0.8);
-      this.add.image(W/2,24,'waveBanner').setOrigin(0.5);
-      this.waveText = this.add.text(W/2,24,'WAVE 1',{fontSize:18,color:'#fff'}).setOrigin(0.5);
-      this.hpBarBg = this.add.rectangle(W/2,60,240,16,0x000000).setOrigin(0.5);
-      this.hpBar = this.add.rectangle(W/2,60,240,16,0xff6f00).setOrigin(0.5);
-      this.add.image(W-32,32,'coin').setOrigin(0.5);
+      // UI
+      this.add.image(W-32,32,'coin');
       this.coinText = this.add.text(W-48,24,'0',{fontSize:18,color:'#fff'}).setOrigin(1,0);
+      this.hpText = this.add.text(16,24,'HP: 100',{fontSize:18,color:'#fff'});
 
-      // produce button
-      this.produceBtn = this.add.image(72,H-56,'btnProduce').setInteractive({useHandCursor:true});
-      this.produceBtn.on('pointerdown', ()=> this.spawnProduct());
+      this.buildSlots();
 
-      // input for pickups
-      this.input.on('gameobjectdown', (_p,obj)=>{
-        if(obj.texture.key==='pickupDollar'){ coins+=20; obj.destroy(); this.updateUI(); }
-        if(obj.texture.key==='chest'){ coins+=40; obj.destroy(); this.updateUI(); }
-      });
-
-      // bullet vs zombie
+      // collisions
       this.physics.add.overlap(this.bullets,this.zombies,(b,z)=>{
         z.hp -= b.damage; b.destroy();
-        if(z.hp<=0) this.onZombieKilled(z);
+        if(z.hp<=0) this.killZombie(z);
+      });
+      this.physics.add.collider(this.zombies,this.beltZone,(z)=>{
+        this.flash(z);
+        baseHP -= 10;
+        z.destroy();
+        this.updateUI();
+      });
+      this.physics.add.overlap(this.zombies,this.products,(z,p)=>{
+        this.flash(z);
+        p.hp -= 10;
+        if(p.hp<=0) p.destroy();
       });
 
-      // zombie spawn timer
-      this.time.addEvent({ delay:4000, loop:true, callback:()=> this.spawnWaveTick() });
+      // spawn timer
+      this.time.addEvent({delay:2000,loop:true,callback:()=>this.spawnZombie()});
     }
 
-    buildBelt(){
-      // top/bottom straights
-      for(let x=belt.left; x<belt.right; x+=64){
-        this.add.image(x+32,belt.top+16,'conveyor');
-        this.add.image(x+32,belt.bottom-16,'conveyor').setFlipY(true);
+    buildSlots(){
+      for(let i=0;i<3;i++){
+        const x=80+i*72, y=H-64;
+        const slot=this.add.rectangle(x,y,64,64,0x222222).setStrokeStyle(2,0xffffff);
+        if(i===0){
+          this.add.image(x,y,'turret');
+          this.add.image(x-16,y+24,'coin').setScale(0.75);
+          this.add.text(x+4,y+16,'50',{fontSize:14,color:'#fff'});
+          slot.setInteractive({useHandCursor:true});
+          slot.on('pointerdown',()=>{
+            if(coins>=50){
+              coins-=50; this.spawnProduct(); this.updateUI();
+            }
+          });
+        }
       }
-      // sides
-      for(let y=belt.top+32; y<belt.bottom-32; y+=64){
-        this.add.image(belt.left+32,y+32,'conveyor').setAngle(90);
-        this.add.image(belt.right-32,y+32,'conveyor').setAngle(90);
-      }
-      // corners
-      this.add.image(belt.left+32,belt.top+32,'conveyorCorner');
-      this.add.image(belt.right-32,belt.top+32,'conveyorCorner').setFlipX(true);
-      this.add.image(belt.left+32,belt.bottom-32,'conveyorCorner').setFlipY(true);
-      this.add.image(belt.right-32,belt.bottom-32,'conveyorCorner').setFlipX(true).setFlipY(true);
     }
 
     spawnProduct(){
-      // capacity & spawn point free
-      const startX = belt.left+32, startY = belt.bottom-32;
-      if(this.products.getChildren().length>=12) return;
-      const blocked = this.products.getChildren().some(p=>Phaser.Math.Distance.Between(p.x,p.y,startX,startY)<40);
-      if(blocked) return;
-
-      const p = this.physics.add.image(startX,startY,'product').setDepth(2);
-      p.dir='right';
-      p.speed=beltSpeed;
-      p.range=160; p.damage=8; p.fireDelay=500; p.fireCd=0; p.hp=40;
-      p.body.setVelocity(beltSpeed,0).setAllowGravity(false);
+      const p=this.physics.add.image(32,this.beltY,'turret');
+      p.speed=2;
+      p.range=160;
+      p.damage=30;
+      p.fireRate=1000;
+      p.cooldown=0;
+      p.hp=100;
+      p.body.setAllowGravity(false);
       this.products.add(p);
     }
 
-    spawnWaveTick(){
-      // chance to spawn pickups
-      if(Phaser.Math.Between(0,100)<30){
-        const d=this.add.image(Phaser.Math.Between(100,W-100),Phaser.Math.Between(100,H-100),'pickupDollar').setInteractive({useHandCursor:true});
-        this.drops.add(d);
-      }
-      if(Phaser.Math.Between(0,100)<15){
-        const c=this.add.image(Phaser.Math.Between(100,W-100),Phaser.Math.Between(100,H-100),'chest').setInteractive({useHandCursor:true});
-        this.drops.add(c);
-      }
-      this.spawnZombie(this.nextEnemy);
-      this.nextEnemy='zombie';
-    }
-
     spawnZombie(){
-      const z = this.physics.add.sprite(-20, Phaser.Math.Between(belt.top,belt.bottom),'zombie',0);
+      const side=Phaser.Math.Between(0,3);
+      let x,y;
+      if(side===0){ x=Phaser.Math.Between(0,W); y=-20; }
+      else if(side===1){ x=W+20; y=Phaser.Math.Between(0,H); }
+      else if(side===2){ x=Phaser.Math.Between(0,W); y=H+20; }
+      else { x=-20; y=Phaser.Math.Between(0,H); }
+      const z=this.physics.add.sprite(x,y,'zombie');
       z.anims.play('zombie_walk');
-      z.hp = 40;
-      z.body.setVelocityX(40).setAllowGravity(false);
+      z.hp=100;
+      z.body.setAllowGravity(false);
       this.zombies.add(z);
+      this.physics.moveTo(z,W/2,this.beltY,30);
     }
 
-    onZombieKilled(z){
-      coins += 10;
+    killZombie(z){
+      const drop=this.add.image(z.x,z.y,'coin').setInteractive({useHandCursor:true});
+      this.drops.add(drop);
+      drop.on('pointerdown',()=>{ coins+=10; drop.destroy(); this.updateUI(); });
       z.destroy();
-      this.updateUI();
     }
 
-    fireBullet(x,y,target,damage){
-      const b=this.physics.add.image(x,y,'bullet');
-      b.damage=damage; b.body.setAllowGravity(false);
-      const dx=target.x-x, dy=target.y-y, len=Math.hypot(dx,dy) || 1;
-      const speed=300;
-      b.setVelocity((dx/len)*speed,(dy/len)*speed);
+    flash(obj){
+      obj.setTintFill(0xffffff);
+      this.time.delayedCall(100,()=>obj.clearTint());
+    }
+
+    fireLaser(p,target){
+      const b=this.physics.add.image(p.x,p.y,'laser');
+      b.damage=p.damage;
+      this.physics.moveTo(b,target.x,target.y,400);
       this.bullets.add(b);
-      this.time.delayedCall(2000,()=>b.destroy());
+      this.time.delayedCall(500,()=>b.destroy());
     }
 
-    findTarget(x,y,range){
+    getTarget(p){
       let best=null, bestD=1e9;
       this.zombies.getChildren().forEach(z=>{
-        const d=Phaser.Math.Distance.Between(x,y,z.x,z.y);
-        if(d<range && d<bestD){ best=z; bestD=d; }
+        const d=Phaser.Math.Distance.Between(p.x,p.y,z.x,z.y);
+        if(d<p.range && d<bestD){ best=z; bestD=d; }
       });
       return best;
     }
 
     update(_t,dt){
-      // products move along belt & attack
       this.products.getChildren().forEach(p=>{
-        if(!p.active) return;
-        if(p.dir==='right' && p.x>=belt.right-32){ p.dir='up'; p.setVelocity(0,-p.speed); }
-        else if(p.dir==='up' && p.y<=belt.top+32){ p.dir='left'; p.setVelocity(-p.speed,0); }
-        else if(p.dir==='left' && p.x<=belt.left+32){ p.dir='down'; p.setVelocity(0,p.speed); }
-        else if(p.dir==='down' && p.y>=belt.bottom-32){
-          if(Math.abs(p.x-(belt.left+belt.right)/2)<32){ coins+=10; p.destroy(); this.updateUI(); return; }
-          p.dir='right'; p.setVelocity(p.speed,0);
-        }
-        p.fireCd -= dt;
-        if(p.fireCd<=0){
-          const t=this.findTarget(p.x,p.y,p.range);
-          if(t){ this.fireBullet(p.x,p.y,t,p.damage); p.fireCd=p.fireDelay; }
+        p.x += p.speed;
+        if(p.x>W+32) p.destroy();
+        p.cooldown -= dt;
+        if(p.cooldown<=0){
+          const t=this.getTarget(p);
+          if(t){
+            this.fireLaser(p,t);
+            p.cooldown=p.fireRate;
+          }
         }
       });
-
-      // zombies progress
       this.zombies.getChildren().forEach(z=>{
-        if(z.x > W+20){ z.destroy(); baseHP -= 10; this.updateUI(); }
+        if(z.body) z.setFlipX(z.body.velocity.x>0);
       });
     }
 
     updateUI(){
       this.coinText.setText(coins);
-      this.waveText.setText('WAVE '+wave);
-      this.hpBar.width = (baseHP/maxBaseHP)*240;
+      this.hpText.setText('HP: '+baseHP);
     }
   }
 
-  const config = {
-    type: Phaser.AUTO,
-    width: W, height: H,
-    backgroundColor: '#2b6dbb',
-    parent: 'game',
-    physics: { default:'arcade', arcade:{ debug:false } },
-    scene: [Main]
+  const config={
+    type:Phaser.AUTO,
+    width:W,height:H,
+    parent:'game',
+    backgroundColor:'#1e1b1b',
+    physics:{default:'arcade',arcade:{debug:false}},
+    scene:[Boot,Title,Quest,Main]
   };
-
   new Phaser.Game(config);
 })();
 </script>
 </body>
 </html>
+
+
