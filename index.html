@@ -187,15 +187,20 @@
 
     spawnZombie(){
       const y=H/2;
-      // spawn a small zombie on the left moving rightward
-      const z=this.physics.add.sprite(-32,y,'zombie').setScale(0.2).setFlipX(true);
+
+      // 더 보기 쉽게: 기본 크기(scale 1) + 화면 가장자리에 가깝게 스폰 + 속도 증가
+      const z=this.physics.add.sprite(-12,y,'zombie')
+        .setScale(1)
+        .setFlipX(true);
+
       z.anims.play('zombie_walk');
       z.hp=100;
       z.body.setAllowGravity(false);
-      z.setVelocityX(20);
+      z.setVelocityX(60); // 20 → 60 : 등장 체감 개선
       this.zombies.add(z);
 
-      // schedule next spawn and gradually accelerate
+      // 다음 스폰 예약 (가속 로직 유지)
+
       this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
       this.time.delayedCall(this.spawnDelay,()=>this.spawnZombie());
     }
