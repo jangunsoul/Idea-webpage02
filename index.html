@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  let coins=0;
+  let coins=100;
   let baseHP=100;
   let wave=1;
 
@@ -88,6 +88,7 @@
 
       // UI
       this.buildUI();
+      this.updateUI();
 
       // collisions
       this.physics.add.overlap(this.bullets,this.zombies,(b,z)=>{
@@ -97,10 +98,7 @@
 
       // spawn timer
       this.spawnDelay=4500;
-      this.spawnEvent=this.time.addEvent({delay:this.spawnDelay,loop:true,callback:()=>{
-        this.spawnZombie();
-        this.spawnEvent.delay=Math.max(1000,this.spawnEvent.delay*0.97);
-      }});
+      this.spawnEvent=this.time.addEvent({delay:this.spawnDelay,loop:true,callback:this.spawnZombie,callbackScope:this});
       this.spawnZombie();
     }
 
@@ -154,7 +152,8 @@
         this.slots.push(s);
       }
       // turret product in first slot
-      this.add.image(this.slots[0].x,this.slots[0].y,'turret');
+      const turretIcon=this.add.image(this.slots[0].x,this.slots[0].y,'turret').setInteractive({useHandCursor:true});
+      turretIcon.on('pointerdown',()=>this.slots[0].emit('pointerdown'));
       this.add.image(this.slots[0].x-20,this.slots[0].y+20,'coin').setScale(0.75);
       this.add.text(this.slots[0].x-6,this.slots[0].y+12,'50',{fontSize:14,color:'#fff'});
       this.slots[0].on('pointerdown',()=>{
@@ -185,13 +184,16 @@
     }
 
     spawnZombie(){
-      const y=Phaser.Math.Between(64,H-64);
+      const y=H/2;
       const z=this.physics.add.sprite(-32,y,'zombieR').setScale(1);
       z.anims.play('zombie_walk_right');
       z.hp=100;
       z.body.setAllowGravity(false);
       z.setVelocityX(20);
       this.zombies.add(z);
+      if(this.spawnEvent){
+        this.spawnEvent.delay=Math.max(1000,this.spawnEvent.delay*0.97);
+      }
     }
 
     killZombie(z){
