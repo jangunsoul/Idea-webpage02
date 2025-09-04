@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.6';
+  const VERSION='0.0.7';
   let coins=100;
   let baseHP=100;
   let wave=1;
@@ -26,6 +26,8 @@
     preload(){
       // sprites
       this.load.spritesheet('zombie','resources/sprites/zombie.png',{frameWidth:32,frameHeight:32});
+      this.load.spritesheet('robot','resources/sprites/robot.png',{frameWidth:48,frameHeight:48});
+      this.load.spritesheet('boss','resources/sprites/boss.png',{frameWidth:48,frameHeight:48});
       this.load.image('turret','resources/sprites/product_turret.png');
       // tiles
       this.load.spritesheet('conveyor','resources/tiles/conveyor.png',{frameWidth:32,frameHeight:32});
@@ -43,6 +45,8 @@
     }
     create(){
       this.anims.create({key:'zombie_walk',frames:this.anims.generateFrameNumbers('zombie',{start:0,end:3}),frameRate:6,repeat:-1});
+      this.anims.create({key:'robot_walk',frames:this.anims.generateFrameNumbers('robot',{start:0,end:2}),frameRate:6,repeat:-1});
+      this.anims.create({key:'boss_walk',frames:this.anims.generateFrameNumbers('boss',{start:0,end:1}),frameRate:6,repeat:-1});
       // slow the belt animation so tiles appear to move more gently
       this.anims.create({key:'belt_move',frames:this.anims.generateFrameNumbers('conveyor',{start:0,end:1}),frameRate:3,repeat:-1});
       this.anims.create({key:'belt_corner',frames:this.anims.generateFrameNumbers('conveyor_corner',{start:0,end:1}),frameRate:3,repeat:-1});
@@ -84,7 +88,7 @@
 
       // groups
       this.products=this.add.group();
-      this.zombies=this.physics.add.group();
+      this.enemies=this.physics.add.group();
       this.bullets=this.physics.add.group({allowGravity:false});
       this.drops=this.physics.add.group({allowGravity:false});
 
@@ -93,14 +97,14 @@
       this.updateUI();
 
       // collisions
-      this.physics.add.overlap(this.bullets,this.zombies,(b,z)=>{
-        z.hp-=b.damage; b.destroy();
-        if(z.hp<=0) this.killZombie(z);
+      this.physics.add.overlap(this.bullets,this.enemies,(b,e)=>{
+        e.hp-=b.damage; b.destroy();
+        if(e.hp<=0) this.killEnemy(e);
       });
 
       // spawn timer
       this.spawnDelay=4500;
-      this.spawnZombie();
+      this.spawnEnemy();
     }
 
     buildConveyor(){
@@ -185,7 +189,7 @@
       this.products.add(p);
     }
 
-    spawnZombie(){
+    spawnEnemy(){
       // spawn at a random screen edge
       const edge=Phaser.Math.Between(0,3);
       let x,y;
@@ -199,27 +203,35 @@
         x=Phaser.Math.Between(0,W); y=H+20;
       }
 
-      const z=this.physics.add.sprite(x,y,'zombie').setScale(0.2);
-      z.anims.play('zombie_walk');
-      z.hp=100;
-      z.body.setAllowGravity(false);
+      // select enemy type
+      const types=[
+        {key:'zombie',anim:'zombie_walk',hp:100,speed:30},
+        {key:'robot',anim:'robot_walk',hp:150,speed:25},
+        {key:'boss',anim:'boss_walk',hp:300,speed:20}
+      ];
+      const t=Phaser.Utils.Array.GetRandom(types);
+
+      const e=this.physics.add.sprite(x,y,t.key).setScale(1);
+      e.anims.play(t.anim);
+      e.hp=t.hp;
+      e.body.setAllowGravity(false);
 
       // move toward conveyor center
       const targetX=W/2, targetY=H/2;
-      this.physics.moveTo(z,targetX,targetY,30);
-      z.setFlipX(z.body.velocity.x>0);
-      this.zombies.add(z);
+      this.physics.moveTo(e,targetX,targetY,t.speed);
+      e.setFlipX(e.body.velocity.x>0);
+      this.enemies.add(e);
 
       // schedule next spawn with accelerating delay
       this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
-      this.time.delayedCall(this.spawnDelay,this.spawnZombie,[],this);
+      this.time.delayedCall(this.spawnDelay,this.spawnEnemy,[],this);
     }
 
-    killZombie(z){
-      const drop=this.add.image(z.x,z.y,'coin').setInteractive({useHandCursor:true});
+    killEnemy(e){
+      const drop=this.add.image(e.x,e.y,'coin').setInteractive({useHandCursor:true});
       this.drops.add(drop);
       drop.on('pointerdown',()=>{coins+=10; drop.destroy(); this.updateUI();});
-      z.destroy();
+      e.destroy();
     }
 
     fireLaser(p,target){
@@ -232,7 +244,7 @@
 
     getTarget(p){
       let best=null,bestD=1e9;
-      this.zombies.getChildren().forEach(z=>{
+      this.enemies.getChildren().forEach(z=>{
         const d=Phaser.Math.Distance.Between(p.x,p.y,z.x,z.y);
         if(d<p.range && d<bestD){best=z;bestD=d;}
       });
@@ -253,8 +265,8 @@
         }
       });
 
-      // check zombies reaching conveyor center
-      this.zombies.getChildren().forEach(z=>{
+      // check enemies reaching conveyor center
+      this.enemies.getChildren().forEach(z=>{
         if(Phaser.Math.Distance.Between(z.x,z.y,W/2,H/2)<32){
           baseHP-=10; z.destroy(); this.updateUI();
         }
