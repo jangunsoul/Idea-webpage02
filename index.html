@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.5';
+  const VERSION='0.0.6';
   let coins=100;
   let baseHP=100;
   let wave=1;
@@ -186,20 +186,31 @@
     }
 
     spawnZombie(){
-      const y=H/2;
+      // spawn at a random screen edge
+      const edge=Phaser.Math.Between(0,3);
+      let x,y;
+      if(edge===0){ // left
+        x=-20; y=Phaser.Math.Between(0,H);
+      }else if(edge===1){ // right
+        x=W+20; y=Phaser.Math.Between(0,H);
+      }else if(edge===2){ // top
+        x=Phaser.Math.Between(0,W); y=-20;
+      }else{ // bottom
+        x=Phaser.Math.Between(0,W); y=H+20;
+      }
 
-      // 더 보기 쉽게: 기본 크기(scale 1) + 화면 가장자리에 가깝게 스폰 + 속도 증가
-      const z=this.physics.add.sprite(-12,y,'zombie')
-        .setScale(1)
-        .setFlipX(true);
-
+      const z=this.physics.add.sprite(x,y,'zombie').setScale(0.2);
       z.anims.play('zombie_walk');
       z.hp=100;
       z.body.setAllowGravity(false);
-      z.setVelocityX(60); // 20 → 60 : 등장 체감 개선
+
+      // move toward conveyor center
+      const targetX=W/2, targetY=H/2;
+      this.physics.moveTo(z,targetX,targetY,30);
+      z.setFlipX(z.body.velocity.x>0);
       this.zombies.add(z);
 
-      // 다음 스폰 예약 (가속 로직 유지)
+      // schedule next spawn with accelerating delay
       this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
       this.time.delayedCall(this.spawnDelay,this.spawnZombie,[],this);
     }
@@ -242,9 +253,9 @@
         }
       });
 
-      // check zombies reaching right edge
+      // check zombies reaching conveyor center
       this.zombies.getChildren().forEach(z=>{
-        if(z.x>W){
+        if(Phaser.Math.Distance.Between(z.x,z.y,W/2,H/2)<32){
           baseHP-=10; z.destroy(); this.updateUI();
         }
       });
