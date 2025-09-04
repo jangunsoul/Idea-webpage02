@@ -98,7 +98,6 @@
 
       // spawn timer
       this.spawnDelay=4500;
-      this.spawnEvent=this.time.addEvent({delay:this.spawnDelay,loop:true,callback:()=>this.spawnZombie()});
       this.spawnZombie();
     }
 
@@ -194,9 +193,10 @@
       z.body.setAllowGravity(false);
       z.setVelocityX(20);
       this.zombies.add(z);
-      if(this.spawnEvent){
-        this.spawnEvent.delay=Math.max(1000,this.spawnEvent.delay*0.97);
-      }
+
+      // schedule next spawn and gradually accelerate
+      this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
+      this.time.delayedCall(this.spawnDelay,()=>this.spawnZombie());
     }
 
     killZombie(z){
