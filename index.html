@@ -20,7 +20,6 @@
   let baseHP=100;
   let wave=1;
 
-
   class Boot extends Phaser.Scene {
     constructor(){ super('boot'); }
     preload(){
@@ -102,6 +101,7 @@
         this.spawnZombie();
         this.spawnEvent.delay=Math.max(1000,this.spawnEvent.delay*0.97);
       }});
+      this.spawnZombie();
     }
 
     buildConveyor(){
@@ -125,10 +125,12 @@
 
     buildUI(){
       // next enemy preview
-      const box=this.add.rectangle(16,16,128,48,0x000000,0.3).setOrigin(0).setStrokeStyle(2,0xffffff);
-      this.add.text(24,20,'Next',{fontSize:16,color:'#fff'});
+      const box=this.add.rectangle(16,16,128,64,0x000000,0.3).setOrigin(0).setStrokeStyle(2,0xffffff);
+      this.add.text(24,24,'Next',{fontSize:16,color:'#fff'});
+      this.nextIcons=[];
       for(let i=0;i<3;i++){
-        this.add.sprite(40+i*36,44,'zombieR',0).setScale(0.5);
+        const icon=this.add.sprite(48+i*40,56,'zombieR',0);
+        this.nextIcons.push(icon);
       }
 
       // wave banner and hp bar
@@ -143,11 +145,19 @@
       this.add.image(W-40,24,'coin');
       this.coinText=this.add.text(W-48,16,'0',{fontSize:18,color:'#fff'}).setOrigin(1,0);
 
-      // produce slot
-      const slot=this.add.image(80,H-64,'btn_produce').setInteractive({useHandCursor:true});
-      this.add.image(56,H-40,'coin').setScale(0.75);
-      this.add.text(72,H-52,'50',{fontSize:14,color:'#fff'});
-      slot.on('pointerdown',()=>{
+      // production slots
+      this.slots=[];
+      for(let i=0;i<3;i++){
+        const s=this.add.rectangle(64+i*72,H-48,64,64,0x000000,0.3)
+          .setStrokeStyle(2,0xffffff).setOrigin(0.5)
+          .setInteractive({useHandCursor:true});
+        this.slots.push(s);
+      }
+      // turret product in first slot
+      this.add.image(this.slots[0].x,this.slots[0].y,'turret');
+      this.add.image(this.slots[0].x-20,this.slots[0].y+20,'coin').setScale(0.75);
+      this.add.text(this.slots[0].x-6,this.slots[0].y+12,'50',{fontSize:14,color:'#fff'});
+      this.slots[0].on('pointerdown',()=>{
         if(coins>=50 && this.canPlaceProduct()){
           coins-=50; this.spawnProduct(); this.updateUI();
         }
@@ -163,7 +173,9 @@
       this.physics.add.existing(p);
       p.body.setAllowGravity(false);
       p.progress=0;
-      p.speed=0.0001; // progress per ms
+      const start=this.path.getPoint(0);
+      p.setPosition(start.x,start.y);
+      p.speed=0.0002; // progress per ms
       p.range=160;
       p.damage=30;
       p.fireRate=1000;
@@ -173,7 +185,8 @@
     }
 
     spawnZombie(){
-      const z=this.physics.add.sprite(-20,H/2,'zombieR').setScale(0.1);
+      const y=Phaser.Math.Between(64,H-64);
+      const z=this.physics.add.sprite(-32,y,'zombieR').setScale(1);
       z.anims.play('zombie_walk_right');
       z.hp=100;
       z.body.setAllowGravity(false);
@@ -247,5 +260,4 @@
 </script>
 </body>
 </html>
-
 
