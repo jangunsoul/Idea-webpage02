@@ -211,7 +211,7 @@
       ];
       const t=Phaser.Utils.Array.GetRandom(types);
 
-      const e=this.physics.add.sprite(x,y,t.key).setScale(0.2);
+      const e=this.physics.add.sprite(x,y,t.key).setScale(1);
       e.anims.play(t.anim);
       e.hp=t.hp;
       e.body.setAllowGravity(false);
