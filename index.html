@@ -16,8 +16,8 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.15';
-  let coins=100;
+  const VERSION='0.0.16';
+  let coins=300;
   let baseHP=200;
   const base={x:W/2,y:272,width:448,height:160,hp:200,maxHp:200};
   let wave=1;
@@ -81,7 +81,7 @@
   class Main extends Phaser.Scene {
     constructor(){ super('main'); }
     init(){
-      coins=100;
+      coins=300;
       baseHP=200;
       base.hp=200;
       base.maxHp=200;
@@ -171,11 +171,16 @@
 
       // production slots
       this.slots=[];
+      this.slotOverlays=[];
+      this.cooldowns=[0,0,0];
       for(let i=0;i<3;i++){
         const s=this.add.rectangle(64+i*72,H-48,64,64,0x000000,0.3)
           .setStrokeStyle(2,0xffffff).setOrigin(0.5)
           .setInteractive({useHandCursor:true});
         this.slots.push(s);
+        const ov=this.add.rectangle(s.x,s.y+32,64,64,0x000000,0.6)
+          .setOrigin(0.5,1).setVisible(false);
+        this.slotOverlays.push(ov);
       }
       // turret product in first slot
       const turretIcon=this.add.image(this.slots[0].x,this.slots[0].y,'turret').setInteractive({useHandCursor:true});
@@ -183,8 +188,11 @@
       this.add.image(this.slots[0].x-20,this.slots[0].y+20,'coin').setScale(0.75);
       this.add.text(this.slots[0].x-6,this.slots[0].y+12,'50',{fontSize:14,color:'#fff'});
       this.slots[0].on('pointerdown',()=>{
-        if(coins>=50 && this.canPlaceProduct()){
+        if(coins>=50 && this.canPlaceProduct() && this.cooldowns[0]<=0){
           coins-=50; this.spawnProduct(); this.updateUI();
+          this.cooldowns[0]=5000;
+          const ov=this.slotOverlays[0];
+          ov.setVisible(true); ov.setDisplaySize(64,64);
         }
       });
     }
@@ -296,7 +304,7 @@
       p.destroy();
     }
 
-    fireLaser(shooter,target,damage){
+    fireLaser(shooter,target,damage,damageTarget){
       const angle=Phaser.Math.Angle.Between(shooter.x,shooter.y,target.x,target.y);
       const dist=Phaser.Math.Distance.Between(shooter.x,shooter.y,target.x,target.y);
       const beam=this.add.image(shooter.x,shooter.y,'laser').setOrigin(0,0.5);
@@ -304,14 +312,14 @@
       beam.setDisplaySize(dist,4);
       this.lasers.add(beam);
       this.time.delayedCall(100,()=>beam.destroy());
-      this.applyDamage(target,damage);
+      this.applyDamage(damageTarget||target,damage);
     }
 
-    fireBullet(shooter,target,damage){
+    fireBullet(shooter,target,damage,damageTarget){
       const bullet=this.add.image(shooter.x,shooter.y,'bullet');
       this.tweens.add({targets:bullet,x:target.x,y:target.y,duration:200,onComplete:()=>{
         bullet.destroy();
-        this.applyDamage(target,damage);
+        this.applyDamage(damageTarget||target,damage);
       }});
     }
 
@@ -338,7 +346,18 @@
     }
 
     enemyAttack(e,target){
-      if(e.attackStyle==='laser'){
+      if(target===base){
+        const tx=Phaser.Math.Clamp(e.x,base.x-base.width/2,base.x+base.width/2);
+        const ty=Phaser.Math.Clamp(e.y,base.y-base.height/2,base.y+base.height/2);
+        const point={x:tx,y:ty};
+        if(e.attackStyle==='laser'){
+          this.fireLaser(e,point,e.attackDamage,base);
+        }else if(e.attackStyle==='bullet'){
+          this.fireBullet(e,point,e.attackDamage,base);
+        }else{
+          this.applyDamage(base,e.attackDamage);
+        }
+      }else if(e.attackStyle==='laser'){
         this.fireLaser(e,target,e.attackDamage);
       }else if(e.attackStyle==='bullet'){
         this.fireBullet(e,target,e.attackDamage);
@@ -409,6 +428,24 @@
           e.attackTimer-=dt;
           if(e.attackTimer<=0){
             this.enemyAttack(e,base);
+          }
+        }
+      });
+
+      // update production slot cooldown overlays
+      this.cooldowns.forEach((cd,i)=>{
+        if(cd>0){
+          this.cooldowns[i]-=dt;
+          const ratio=this.cooldowns[i]/5000;
+          const ov=this.slotOverlays[i];
+          ov.setDisplaySize(64,64*ratio);
+          ov.x=this.slots[i].x;
+          ov.y=this.slots[i].y+32;
+          if(this.cooldowns[i]<=0){
+            ov.setVisible(false);
+            this.cooldowns[i]=0;
+          }else{
+            ov.setVisible(true);
           }
         }
       });
