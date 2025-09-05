@@ -16,10 +16,10 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.13';
+  const VERSION='0.0.14';
   let coins=100;
   let baseHP=200;
-  const base={x:W/2,y:272,hp:200,maxHp:200};
+  const base={x:W/2,y:272,width:448,height:160,hp:200,maxHp:200};
   let wave=1;
 
   class Boot extends Phaser.Scene {
@@ -80,6 +80,13 @@
 
   class Main extends Phaser.Scene {
     constructor(){ super('main'); }
+    init(){
+      coins=100;
+      baseHP=200;
+      base.hp=200;
+      base.maxHp=200;
+      wave=1;
+    }
     create(){
       // floor is a plain background with no physics body so enemies can cross freely
       this.add.tileSprite(0,0,W,H,'floor').setOrigin(0).setDepth(-1);
@@ -97,10 +104,11 @@
       this.lasers=this.add.group();
       this.drops=this.physics.add.group({allowGravity:false});
       this.gameOver=false;
+
       // central base collision zone covering the conveyor area
-      this.baseZone=this.add.zone(W/2,272,448,160);
+      this.baseZone=this.add.zone(base.x,base.y,base.width,base.height);
       this.physics.add.existing(this.baseZone,true);
-      this.physics.add.collider(this.enemies,this.baseZone,(e)=>{e.body.stop();e.atBase=true;e.target=null;});
+      this.physics.add.collider(this.enemies,this.baseZone,(e)=>{e.body.stop();e.atBase=true;});
       // stop enemies when they bump into products and mark target
       this.physics.add.collider(this.enemies,this.products,(e,p)=>{e.body.stop();e.target=p;});
 
@@ -386,10 +394,7 @@
           const prod=this.products.getChildren().find(p=>Phaser.Math.Distance.Between(e.x,e.y,p.x,p.y)<=e.attackRange);
           if(prod){e.target=prod; e.body.stop();}
         }
-        // check base range
-        if(!e.atBase && Phaser.Math.Distance.Between(e.x,e.y,base.x,base.y)<=e.attackRange){
-          e.atBase=true; e.body.stop();
-        }
+        // base contact handled by collider
         if(e.target){
           e.attackTimer-=dt;
           if(e.attackTimer<=0){
