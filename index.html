@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.19';
+  const VERSION='0.0.20';
   let coins=300;
   let baseHP=200;
   const base={x:W/2,y:272,width:448,height:160,hp:200,maxHp:200};
@@ -107,6 +107,7 @@
       this.enemies=this.physics.add.group({allowGravity:false,collideWorldBounds:false});
       this.lasers=this.add.group();
       this.drops=this.physics.add.group({allowGravity:false});
+      this.supplies=this.add.group();
       this.gameOver=false;
 
       // enemies collide with conveyor tiles or products
@@ -122,6 +123,7 @@
       // spawn timer
       this.spawnDelay=4500;
       this.spawnEnemy();
+      this.scheduleSupply();
     }
 
     buildConveyor(){
@@ -364,11 +366,38 @@
       this.time.delayedCall(this.spawnDelay,this.spawnEnemy,[],this);
     }
 
+    scheduleSupply(){
+      const delay=Phaser.Math.Between(10000,20000);
+      this.time.delayedCall(delay,this.spawnSupply,[],this);
+    }
+
+    spawnSupply(){
+      const x=Phaser.Math.Between(50,W-50);
+      const y=Phaser.Math.Between(100,H-100);
+      const chest=this.add.image(x,y,'chest').setInteractive({useHandCursor:true});
+      this.supplies.add(chest);
+      chest.on('pointerdown',()=>{
+        chest.disableInteractive();
+        const amount=Phaser.Math.Between(80,120);
+        coins+=amount;
+        this.updateUI();
+        this.showGainText(chest.x,chest.y,'+'+amount);
+        chest.destroy();
+      });
+      this.scheduleSupply();
+    }
+
     killEnemy(e){
       this.add.sprite(e.x,e.y,'explosion').play('explode');
       const drop=this.add.image(e.x,e.y,'coin');
+      const reward=Math.round(e.maxHp/10);
       this.time.delayedCall(500,()=>{
-        this.tweens.add({targets:drop,x:W-40,y:24,duration:500,onComplete:()=>{coins+=10;drop.destroy();this.updateUI();}});
+        this.tweens.add({targets:drop,x:W-40,y:24,duration:500,onComplete:()=>{
+          drop.destroy();
+          coins+=reward;
+          this.updateUI();
+          this.showGainText(W-40,24,'+'+reward);
+        }});
       });
       if(e.hpBar) e.hpBar.destroy();
       e.destroy();
@@ -548,6 +577,11 @@
       this.hpValue.setText(baseHP);
       this.hpBar.width=200*(baseHP/200);
       base.hp=baseHP;
+    }
+
+    showGainText(x,y,text){
+      const t=this.add.text(x,y,text,{fontSize:16,color:'#fff'}).setOrigin(0.5);
+      this.tweens.add({targets:t,y:y-20,alpha:0,duration:800,onComplete:()=>t.destroy()});
     }
   }
 
