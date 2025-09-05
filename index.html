@@ -16,10 +16,10 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.12';
+  const VERSION='0.0.13';
   let coins=100;
-  let baseHP=100;
-  const base={x:W/2,y:272,hp:100,maxHp:100};
+  let baseHP=200;
+  const base={x:W/2,y:272,hp:200,maxHp:200};
   let wave=1;
 
   class Boot extends Phaser.Scene {
@@ -43,6 +43,7 @@
       this.load.image('pickup_dollar','resources/ui/pickup_dollar.png');
       // effects
       this.load.image('laser','resources/effects/laser.png');
+      this.load.image('bullet','resources/effects/bullet.png');
       this.load.spritesheet('explosion','resources/effects/explosion.png',{frameWidth:32,frameHeight:32});
     }
     create(){
@@ -95,7 +96,7 @@
       this.enemies=this.physics.add.group({allowGravity:false,collideWorldBounds:false});
       this.lasers=this.add.group();
       this.drops=this.physics.add.group({allowGravity:false});
-
+      this.gameOver=false;
       // central base collision zone covering the conveyor area
       this.baseZone=this.add.zone(W/2,272,448,160);
       this.physics.add.existing(this.baseZone,true);
@@ -194,11 +195,11 @@
       p.setPosition(start.x,start.y);
       // reduce conveyor traversal speed by half
       p.speed=0.00005; // progress per ms
-      p.range=160;
+      p.range=128;
       p.damage=30;
       p.fireRate=1000;
       p.cooldown=0;
-      p.hp=100;
+      p.hp=15;
       this.addHPBar(p,0x00ff00);
       this.products.add(p);
     }
@@ -234,18 +235,22 @@
       }
 
       const type=this.nextQueue.shift();
-      let key=type,anim=type+'_walk',hp=100,speed=30;
-      if(type==='robot'){hp=80;speed=40;}
-      else if(type==='boss'){hp=200;speed=20;}
+      let key=type,anim=type+'_walk',hp=100,speed=30,attackRate=2000,damage=5,range=32,style='melee';
+      if(type==='robot'){hp=80;speed=40;attackRate=2000;damage=6;range=96;style='laser';}
+      else if(type==='boss'){hp=200;speed=20;attackRate=500;damage=3;range=112;style='bullet';}
 
       const e=this.enemies.create(x,y,key).setCollideWorldBounds(false);
       if(type==='robot') e.setScale(0.5);
       else e.setScale(1);
-
       e.body.setAllowGravity(false);
       e.anims.play(anim);
       e.hp=hp;
-      e.attackTimer=2000;
+      e.attackRate=attackRate;
+      e.attackTimer=attackRate;
+      e.attackDamage=damage;
+      e.attackRange=range;
+      e.attackStyle=style;
+      e.burst=0;
       e.atBase=false;
       this.addHPBar(e,0xff0000);
 
@@ -286,9 +291,26 @@
       beam.setDisplaySize(dist,4);
       this.lasers.add(beam);
       this.time.delayedCall(100,()=>beam.destroy());
+      this.applyDamage(target,damage);
+    }
+
+    fireBullet(shooter,target,damage){
+      const bullet=this.add.image(shooter.x,shooter.y,'bullet');
+      this.tweens.add({targets:bullet,x:target.x,y:target.y,duration:200,onComplete:()=>{
+        bullet.destroy();
+        this.applyDamage(target,damage);
+      }});
+    }
+
+    applyDamage(target,damage){
       target.hp-=damage;
       if(target===base){
-        baseHP=target.hp; this.updateUI();
+        baseHP=target.hp;
+        this.updateUI();
+        if(baseHP<=0 && !this.gameOver){
+          this.gameOver=true;
+          this.time.delayedCall(100,()=>this.showGameOver());
+        }
         return;
       }
       if(target.hp<=0){
@@ -300,6 +322,36 @@
       }else if(target.hpBar){
         target.hpBar.width=target.displayWidth*(target.hp/target.maxHp);
       }
+    }
+
+    enemyAttack(e,target){
+      if(e.attackStyle==='laser'){
+        this.fireLaser(e,target,e.attackDamage);
+      }else if(e.attackStyle==='bullet'){
+        this.fireBullet(e,target,e.attackDamage);
+      }else{
+        if(target.setTintFill){
+          target.setTintFill(0xffffff);
+          this.time.delayedCall(100,()=>target.clearTint && target.clearTint());
+        }
+        this.applyDamage(target,e.attackDamage);
+      }
+      if(e.texture.key==='boss'){
+        e.burst+=1;
+        if(e.burst>=3){
+          e.attackTimer=2000;
+          e.burst=0;
+        }else{
+          e.attackTimer=e.attackRate;
+        }
+      }else{
+        e.attackTimer=e.attackRate;
+      }
+    }
+
+    showGameOver(){
+      const t=this.add.text(W/2,H/2,'Game Over\nTap to Restart',{fontSize:48,color:'#fff',align:'center'}).setOrigin(0.5);
+      this.input.once('pointerdown',()=>{t.destroy(); this.scene.restart();});
     }
 
     getTarget(p){
@@ -326,32 +378,28 @@
         }
       });
 
-      this.enemies.getChildren().forEach(z=>{
-        if(z.hpBar) z.hpBar.setPosition(z.x,z.y-20);
-        if(z.target && !z.target.active) z.target=null;
-        if(z.target){
-          z.attackTimer-=dt;
-          if(z.attackTimer<=0){
-            if(z.texture.key==='robot'){
-              this.fireLaser(z,z.target,10);
-            }else{
-              z.target.hp-=10; if(z.target.hp<=0) this.killProduct(z.target);
-              if(z.target.hpBar) z.target.hpBar.width=z.target.displayWidth*(z.target.hp/z.target.maxHp);
-              z.target.setTintFill(0xffffff); this.time.delayedCall(100,()=>z.target.clearTint());
-            }
-            z.attackTimer=2000;
+      this.enemies.getChildren().forEach(e=>{
+        if(e.hpBar) e.hpBar.setPosition(e.x,e.y-20);
+        if(e.target && !e.target.active) e.target=null;
+        // acquire target if none
+        if(!e.target){
+          const prod=this.products.getChildren().find(p=>Phaser.Math.Distance.Between(e.x,e.y,p.x,p.y)<=e.attackRange);
+          if(prod){e.target=prod; e.body.stop();}
+        }
+        // check base range
+        if(!e.atBase && Phaser.Math.Distance.Between(e.x,e.y,base.x,base.y)<=e.attackRange){
+          e.atBase=true; e.body.stop();
+        }
+        if(e.target){
+          e.attackTimer-=dt;
+          if(e.attackTimer<=0){
+            this.enemyAttack(e,e.target);
           }
-        }else if(z.atBase){
-          z.attackTimer-=dt;
-          if(z.attackTimer<=0){
-            if(z.texture.key==='robot'){
-              this.fireLaser(z,base,10);
-            }else{
-              baseHP-=10; this.updateUI();
-            }
-            z.attackTimer=2000;
-            z.setTintFill(0xffffff);
-            this.time.delayedCall(100,()=>z.clearTint());
+        }else if(e.atBase){
+          e.attackTimer-=dt;
+          if(e.attackTimer<=0){
+            this.enemyAttack(e,base);
+
           }
         }
       });
@@ -360,7 +408,8 @@
     updateUI(){
       this.coinText.setText(coins);
       this.hpValue.setText(baseHP);
-      this.hpBar.width=200*(baseHP/100);
+      this.hpBar.width=200*(baseHP/200);
+
       base.hp=baseHP;
     }
   }
