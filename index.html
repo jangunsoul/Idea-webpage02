@@ -241,6 +241,7 @@
       const e=this.enemies.create(x,y,key).setCollideWorldBounds(false);
       if(type==='robot') e.setScale(0.5);
       else e.setScale(1);
+
       e.body.setAllowGravity(false);
       e.anims.play(anim);
       e.hp=hp;
