@@ -404,6 +404,7 @@
           e.attackTimer-=dt;
           if(e.attackTimer<=0){
             this.enemyAttack(e,base);
+
           }
         }
       });
@@ -413,6 +414,7 @@
       this.coinText.setText(coins);
       this.hpValue.setText(baseHP);
       this.hpBar.width=200*(baseHP/200);
+
       base.hp=baseHP;
     }
   }
