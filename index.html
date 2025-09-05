@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.16';
+  const VERSION='0.0.17';
   let coins=300;
   let baseHP=200;
   const base={x:W/2,y:272,width:448,height:160,hp:200,maxHp:200};
@@ -278,6 +278,7 @@
       // move toward conveyor center
       const targetX=W/2, targetY=H/2;
       this.physics.moveTo(e,targetX,targetY,speed);
+      e.speed=speed;
       e.setFlipX(e.body.velocity.x>0);
 
       this.nextQueue.push(this.randomEnemyType());
@@ -412,13 +413,30 @@
 
       this.enemies.getChildren().forEach(e=>{
         if(e.hpBar) e.hpBar.setPosition(e.x,e.y-20);
-        if(e.target && !e.target.active) e.target=null;
-        // acquire target if none
-        if(!e.target){
-          const prod=this.products.getChildren().find(p=>Phaser.Math.Distance.Between(e.x,e.y,p.x,p.y)<=e.attackRange);
-          if(prod){e.target=prod; e.body.stop();}
+        if(e.target && (!e.target.active || Phaser.Math.Distance.Between(e.x,e.y,e.target.x,e.target.y)>e.attackRange)){
+          e.target=null;
         }
-        // base contact handled by collider
+
+        let tgt=e.target;
+        if(!tgt){
+          const prod=this.products.getChildren().find(p=>Phaser.Math.Distance.Between(e.x,e.y,p.x,p.y)<=e.attackRange);
+          if(prod){ e.target=prod; tgt=prod; }
+          else tgt=base;
+        }
+
+        if(e.attackStyle!=='melee'){
+          const dist=Phaser.Math.Distance.Between(e.x,e.y,tgt.x,tgt.y);
+          if(dist<=e.attackRange*0.8){
+            e.body.setVelocity(0);
+            if(tgt===base) e.atBase=true;
+          }else{
+            this.physics.moveTo(e,tgt.x,tgt.y,e.speed);
+          }
+        }else if(!e.atBase && !e.target){
+          const targetX=W/2, targetY=H/2;
+          this.physics.moveTo(e,targetX,targetY,e.speed);
+        }
+
         if(e.target){
           e.attackTimer-=dt;
           if(e.attackTimer<=0){
