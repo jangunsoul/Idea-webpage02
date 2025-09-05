@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.17';
+  const VERSION='0.0.18';
   let coins=300;
   let baseHP=200;
   const base={x:W/2,y:272,width:448,height:160,hp:200,maxHp:200};
@@ -86,6 +86,9 @@
       base.hp=200;
       base.maxHp=200;
       wave=1;
+      this.totalSpawned=0;
+      this.enemyHpBonus=0;
+      this.enemyDamageBonus=0;
     }
     create(){
       // floor is a plain background with no physics body so enemies can cross freely
@@ -260,6 +263,9 @@
       if(type==='robot'){hp=80;speed=40;attackRate=2000;damage=6;range=96;style='laser';}
       else if(type==='boss'){hp=200;speed=20;attackRate=500;damage=3;range=112;style='bullet';}
 
+      hp += this.enemyHpBonus;
+      damage += this.enemyDamageBonus;
+
       const e=this.enemies.create(x,y,key).setCollideWorldBounds(false);
       if(type==='robot') e.setScale(0.5);
       else e.setScale(1);
@@ -283,6 +289,15 @@
 
       this.nextQueue.push(this.randomEnemyType());
       this.updateNextIcons();
+
+      this.totalSpawned++;
+      this.enemyHpBonus+=2;
+      if(this.totalSpawned % 100 === 0){
+        wave++;
+        this.waveText.setText('WAVE '+wave);
+        this.enemyDamageBonus++;
+        this.enemies.getChildren().forEach(en=>en.attackDamage+=1);
+      }
 
       // schedule next spawn with accelerating delay
       this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
@@ -451,22 +466,21 @@
       });
 
       // update production slot cooldown overlays
-      this.cooldowns.forEach((cd,i)=>{
-        if(cd>0){
-          this.cooldowns[i]-=dt;
+      for(let i=0;i<this.cooldowns.length;i++){
+        if(this.cooldowns[i]>0){
+          this.cooldowns[i]=Math.max(0,this.cooldowns[i]-dt);
+        }
+        const ov=this.slotOverlays[i];
+        if(this.cooldowns[i]>0){
           const ratio=this.cooldowns[i]/5000;
-          const ov=this.slotOverlays[i];
           ov.setDisplaySize(64,64*ratio);
           ov.x=this.slots[i].x;
           ov.y=this.slots[i].y+32;
-          if(this.cooldowns[i]<=0){
-            ov.setVisible(false);
-            this.cooldowns[i]=0;
-          }else{
-            ov.setVisible(true);
-          }
+          ov.setVisible(true);
+        }else{
+          ov.setVisible(false);
         }
-      });
+      }
     }
 
     updateUI(){
