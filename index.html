@@ -97,7 +97,6 @@
       this.lasers=this.add.group();
       this.drops=this.physics.add.group({allowGravity:false});
       this.gameOver=false;
-
       // central base collision zone covering the conveyor area
       this.baseZone=this.add.zone(W/2,272,448,160);
       this.physics.add.existing(this.baseZone,true);
@@ -400,6 +399,7 @@
           e.attackTimer-=dt;
           if(e.attackTimer<=0){
             this.enemyAttack(e,base);
+
           }
         }
       });
@@ -409,6 +409,7 @@
       this.coinText.setText(coins);
       this.hpValue.setText(baseHP);
       this.hpBar.width=200*(baseHP/200);
+
       base.hp=baseHP;
     }
   }
