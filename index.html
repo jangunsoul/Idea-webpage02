@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.9';
+  const VERSION='0.0.10';
   let coins=100;
   let baseHP=100;
   let wave=1;
@@ -188,21 +188,24 @@
     }
 
     spawnEnemy(){
-      // spawn at a random screen edge just inside the world bounds
+      // spawn at a random screen edge but slightly inside the bounds
+      const margin=32;
       const edge=Phaser.Math.Between(0,3);
       let x,y;
       if(edge===0){ // left
-        x=0; y=Phaser.Math.Between(0,H);
+        x=margin; y=Phaser.Math.Between(margin,H-margin);
       }else if(edge===1){ // right
-        x=W; y=Phaser.Math.Between(0,H);
+        x=W-margin; y=Phaser.Math.Between(margin,H-margin);
       }else if(edge===2){ // top
-        x=Phaser.Math.Between(0,W); y=0;
+        x=Phaser.Math.Between(margin,W-margin); y=margin;
       }else{ // bottom
-        x=Phaser.Math.Between(0,W); y=H;
+        x=Phaser.Math.Between(margin,W-margin); y=H-margin;
       }
 
-      // spawn zombie
-      const e=this.physics.add.sprite(x,y,'zombie').setScale(0.2).setCollideWorldBounds(false);
+      // spawn zombie at full size and ensure no world-bound collisions
+      const e=this.enemies.create(x,y,'zombie').setScale(1).setCollideWorldBounds(false);
+      e.body.setAllowGravity(false);
+
       e.anims.play('zombie_walk');
       e.hp=100;
 
@@ -210,7 +213,6 @@
       const targetX=W/2, targetY=H/2;
       this.physics.moveTo(e,targetX,targetY,30);
       e.setFlipX(e.body.velocity.x>0);
-      this.enemies.add(e);
 
       // schedule next spawn with accelerating delay
       this.spawnDelay=Math.max(1000,this.spawnDelay*0.97);
