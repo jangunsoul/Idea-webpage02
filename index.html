@@ -16,7 +16,7 @@
 <script>
 (() => {
   const W=960, H=540;
-  const VERSION='0.0.18';
+  const VERSION='0.0.19';
   let coins=300;
   let baseHP=200;
   const base={x:W/2,y:272,width:448,height:160,hp:200,maxHp:200};
@@ -89,6 +89,7 @@
       this.totalSpawned=0;
       this.enemyHpBonus=0;
       this.enemyDamageBonus=0;
+      this.turretUpgrade=null;
     }
     create(){
       // floor is a plain background with no physics body so enemies can cross freely
@@ -198,6 +199,22 @@
           ov.setVisible(true); ov.setDisplaySize(64,64);
         }
       });
+
+      // upgrade '+' button above slots
+      this.upgradeBtn=this.add.text(this.slots[0].x,this.slots[0].y-80,'+',{
+        fontSize:32,color:'#fff'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+      this.upgradeBtn.on('pointerdown',()=>{ if(!this.turretUpgrade) this.showUpgradeMenu(); });
+
+      // HP recovery button at bottom-right
+      this.healBtn=this.add.rectangle(W-80,H-48,120,40,0x000000,0.3)
+        .setOrigin(0.5).setStrokeStyle(2,0xffffff)
+        .setInteractive({useHandCursor:true});
+      this.add.text(W-80,H-48,'Heal 500',{fontSize:16,color:'#fff'}).setOrigin(0.5);
+      this.healBtn.on('pointerdown',()=>{
+        if(coins>=500 && baseHP<base.maxHp){
+          coins-=500; baseHP=base.maxHp; this.updateUI();
+        }
+      });
     }
 
     canPlaceProduct(){
@@ -228,6 +245,23 @@
       this.products.add(p);
     }
 
+    fireTurret(p,target){
+      if(this.turretUpgrade==='double'){
+        this.fireLaser(p,target,p.damage);
+        this.time.delayedCall(150,()=>{
+          if(p.active && target.active) this.fireLaser(p,target,p.damage);
+        });
+      }else if(this.turretUpgrade==='area'){
+        this.enemies.getChildren().forEach(en=>{
+          if(en.active && Phaser.Math.Distance.Between(p.x,p.y,en.x,en.y)<=p.range){
+            this.fireLaser(p,en,p.damage);
+          }
+        });
+      }else{
+        this.fireLaser(p,target,p.damage);
+      }
+    }
+
     randomEnemyType(){
       const r=Math.random();
       if(r<0.8) return 'zombie';
@@ -240,6 +274,32 @@
         const t=this.nextQueue[i];
         icon.setTexture(t).setFlipX(true);
         if(t==='zombie') icon.setScale(1); else icon.setScale(32/48);
+      });
+    }
+
+    showUpgradeMenu(){
+      if(this.turretUpgrade) return;
+      const overlay=this.add.rectangle(0,0,W,H,0x000000,0.6).setOrigin(0).setInteractive();
+      const close=()=>{overlay.destroy();panel.destroy();opt1.destroy();opt2.destroy();t1.destroy();t1d.destroy();t1c.destroy();t2.destroy();t2d.destroy();t2c.destroy();};
+      overlay.on('pointerdown',close);
+      const panel=this.add.rectangle(W/2,H/2,480,220,0x222222).setStrokeStyle(2,0xffffff);
+      const opt1=this.add.rectangle(W/2-160,H/2,200,160,0x444444,1).setStrokeStyle(2,0xffffff).setInteractive({useHandCursor:true});
+      const opt2=this.add.rectangle(W/2+160,H/2,200,160,0x444444,1).setStrokeStyle(2,0xffffff).setInteractive({useHandCursor:true});
+      const t1=this.add.text(opt1.x,opt1.y-50,'Twin Shot',{fontSize:20,color:'#fff'}).setOrigin(0.5);
+      const t1d=this.add.text(opt1.x,opt1.y,'Fires twice per attack',{fontSize:14,color:'#fff',align:'center'}).setOrigin(0.5);
+      const t1c=this.add.text(opt1.x,opt1.y+50,'Cost:300',{fontSize:16,color:'#fff'}).setOrigin(0.5);
+      const t2=this.add.text(opt2.x,opt2.y-50,'Area Sweep',{fontSize:20,color:'#fff'}).setOrigin(0.5);
+      const t2d=this.add.text(opt2.x,opt2.y,'Hits all in range',{fontSize:14,color:'#fff',align:'center'}).setOrigin(0.5);
+      const t2c=this.add.text(opt2.x,opt2.y+50,'Cost:300',{fontSize:16,color:'#fff'}).setOrigin(0.5);
+      opt1.on('pointerdown',()=>{
+        if(coins>=300){
+          coins-=300; this.turretUpgrade='double'; this.upgradeBtn.setVisible(false); this.updateUI(); close();
+        }
+      });
+      opt2.on('pointerdown',()=>{
+        if(coins>=300){
+          coins-=300; this.turretUpgrade='area'; this.upgradeBtn.setVisible(false); this.updateUI(); close();
+        }
       });
     }
 
@@ -422,7 +482,7 @@
         p.cooldown-=dt;
         if(p.cooldown<=0){
           const t=this.getTarget(p);
-          if(t){this.fireLaser(p,t,p.damage);p.cooldown=p.fireRate;}
+          if(t){this.fireTurret(p,t);p.cooldown=p.fireRate;}
         }
       });
 
