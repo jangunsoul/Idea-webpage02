@@ -205,6 +205,7 @@
       // spawn zombie at full size and ensure no world-bound collisions
       const e=this.enemies.create(x,y,'zombie').setScale(1).setCollideWorldBounds(false);
       e.body.setAllowGravity(false);
+
       e.anims.play('zombie_walk');
       e.hp=100;
 
